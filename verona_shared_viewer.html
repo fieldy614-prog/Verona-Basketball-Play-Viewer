@@ -1,0 +1,90 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Verona Basketball · Shared Play Viewer v6.31</title><style>
+ :root{font-family:Arial,Helvetica,sans-serif;color:#19212c;background:#f1f3f7}*{box-sizing:border-box}body{margin:0}header{background:#85001e;color:white;padding:15px 20px}header h1{font-size:clamp(20px,3vw,30px);margin:0}header p{margin:5px 0 0}.layout{max-width:1900px;margin:14px auto;padding:0 12px;display:grid;grid-template-columns:minmax(210px,24%) minmax(0,1fr);gap:14px}.courtwrap,.notes{background:white;border:1px solid #d2d7e0;border-radius:12px;padding:12px}svg{width:100%;height:auto;display:block;background:#e9ad4d;border-radius:6px}.controls{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}button{border:1px solid #aab2c1;border-radius:7px;background:white;padding:9px 13px;font-weight:bold;cursor:pointer}button.primary{background:#85001e;color:white}button:disabled{opacity:.4}.stepspanel h2,.notes h2{margin:4px 0 10px}.stepspanel{background:white;border:1px solid #d2d7e0;border-radius:12px;padding:12px}.stepitem{display:block;width:100%;text-align:left;margin:7px 0;padding:10px;background:#f5f6f9;border:1px solid #cbd0da;border-radius:8px}.stepitem.active{background:#f9e7ed;border:2px solid #85001e}.actionitem{font-size:12px;color:#414955;padding:4px 0 4px 8px}.viewerbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.notes h3{margin:14px 0 6px}.notes li{margin:7px 0;line-height:1.4}.coaching{white-space:pre-wrap;background:#f4f5f8;padding:9px;border-radius:6px}.small{font-size:13px;color:#555}#stepstatus{font-weight:bold;margin:10px 0}@media(max-width:850px){.layout{grid-template-columns:minmax(170px,27%) minmax(0,1fr)}}@media(max-width:650px){.layout{grid-template-columns:1fr}.stepspanel{max-height:320px;overflow:auto}}
+ .actionitem{padding:8px 9px;border-radius:7px;margin:3px 0;transition:background .12s ease,color .12s ease}.actionitem.current{background:#85001e;color:#fff;font-weight:bold}.actionitem.completed{color:#6b7280;background:#f2f3f6}.actionitem.pending{color:#414955}.stepspanel{align-self:start;position:sticky;top:10px;max-height:calc(100vh - 24px);overflow:auto}.courtwrap{min-width:0}#court{width:100%}@media(max-width:650px){.stepspanel{position:static;max-height:320px}}@media print{.stepspanel{position:static;max-height:none}.controls{display:none}} 
+header{background:linear-gradient(115deg,#900021,#690017);border-bottom:4px solid #c8995b}header p{opacity:.88;font-size:14px}
+.layout{grid-template-columns:minmax(225px,24%) minmax(0,1fr);gap:16px}.courtwrap,.stepspanel{box-shadow:0 6px 22px #18203210}
+.courtwrap{padding:12px}.stepspanel{padding:15px}.stepspanel h2{font-size:20px;color:#900021}
+#court{border-radius:9px;border:5px solid #f5e0b9;box-shadow:inset 0 0 0 1px #c28b48}
+.actionitem{font-size:13px;padding:10px 11px;margin:4px 0;border-radius:9px;border-left:4px solid transparent}
+.actionitem.current{background:#900021;color:white;border-left-color:#f2bc6c;box-shadow:0 3px 9px #90002128}
+.actionitem.completed{background:#f5f5f7;color:#78808d}.actionitem.pending{color:#374151;background:#fff}
+button.primary{background:#900021}button:hover:not(:disabled){filter:brightness(.97)}button:focus-visible{outline:3px solid #dba354;outline-offset:2px}
+#stepstatus{color:#900021}.small{color:#69717d}
+@media(max-width:650px){.layout{grid-template-columns:1fr}.stepspanel{position:static;max-height:280px}.courtwrap{padding:7px}}
+@media print{header{print-color-adjust:exact}.stepspanel{max-height:none}.courtwrap{break-inside:avoid}}
+</style></head><body><header><h1 id="title"></h1><p>Verona Basketball · Shared Play Viewer v6.31 · Follow each action as it happens</p></header><div class="layout"><aside class="stepspanel"><h2>Steps & Actions</h2><div id="steplist"></div></aside><section class="courtwrap"><svg id="court" viewBox="0 0 940 600" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="wood" width="54" height="600" patternUnits="userSpaceOnUse"><rect width="54" height="600" fill="#eeb457"/><path d="M9 0V600 M28 0V600 M44 0V600" stroke="#c88635" stroke-opacity=".10" stroke-width="1"/><rect x="0" width="18" height="600" fill="#f6c574" opacity=".19"/></pattern></defs><rect width="940" height="600" fill="url(#wood)"/><g id="lines" stroke="white" stroke-width="5" fill="none" stroke-linecap="round"/><g id="routes" pointer-events="none"/><g id="players"/></svg><div class="controls"><button id="previous">◀ Previous Step</button><button class="primary" id="play">▶ Play</button><button id="restart">↺ Restart</button><button id="next">Next Step ▶</button><button id="print">Print</button><button id="downloadviewer">Download Play</button></div><div id="stepstatus" aria-live="polite"></div><div class="small">Standalone viewer · No internet connection or editing software required.</div></section></div>
+ <script>(async()=>{
+'use strict';
+const $=id=>document.getElementById(id),NS='http://www.w3.org/2000/svg';
+const make=(parent,tag,attrs={})=>{const e=document.createElementNS(NS,tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,String(v));parent.append(e);return e};
+async function loadPlay(){
+ const raw=location.hash.slice(1);
+ if(!raw){document.body.innerHTML='<main style="font:18px Arial;padding:40px"><h1>Basketball Play Viewer</h1><p>No play was included in this link. Open a shared play link from your coach.</p></main>';return null}
+ try{const bytes=Uint8Array.from(atob(raw.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0));const stream=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));const play=JSON.parse(await new Response(stream).text());if(!Array.isArray(play.steps)||!play.steps.length)throw Error('Invalid play');return play}
+ catch(e){document.body.innerHTML='<main style="font:18px Arial;padding:40px"><h1>Unable to open this play</h1><p>The link may be incomplete. Ask your coach to copy and send the entire link.</p></main>';return null}
+}
+const play=await loadPlay();if(!play)return;
+let stepIndex=0,token=0,running=false,audioContext=null,animationFrame=0;
+const clamp=t=>Math.max(0,Math.min(1,t)),ease=t=>{t=clamp(t);return t*t*(3-2*t)};
+function markings(){const g=$('lines');g.replaceChildren();const path=d=>make(g,'path',{d});if(play.view==='full'){
+ path('M28 28 H912 V572 H28 Z M470 28 V572 M28 99 H96 A192 192 0 0 1 96 501 H28 M912 99 H844 A192 192 0 0 0 844 501 H912 M28 215 H218 V385 H28 M912 215 H722 V385 H912 M218 215 A85 85 0 0 1 218 385 M722 215 A85 85 0 0 0 722 385 M54 260 V340 M886 260 V340');make(g,'circle',{cx:470,cy:300,r:77});make(g,'circle',{cx:78,cy:300,r:14});make(g,'circle',{cx:862,cy:300,r:14});
+ }else{path('M28 28 H912 V572 H28 Z M104 28 V112 A372 372 0 0 0 836 112 V28 M367 28 V272 H573 V28 M367 272 A103 103 0 0 0 573 272 M418 69 H522 M370 572 A100 100 0 0 1 570 572');make(g,'circle',{cx:470,cy:103,r:17});
+ // Dashed interior free-throw semicircle, like the designer.
+ make(g,'path',{d:'M367 272 A103 103 0 0 1 573 272',stroke:'white','stroke-width':4,'stroke-dasharray':'12 10',fill:'none'});
+ }}
+function pathData(a){const p=a.points||[];if(p.length<2)return'';
+ if(a.type==='shot'){const u=p[0],v=p.at(-1);return `M${u.x} ${u.y} Q${(u.x+v.x)/2} ${(u.y+v.y)/2-220} ${v.x} ${v.y}`}
+ if(a.type==='pass'||a.smooth==='sharp'||p.length===2)return'M'+p.map(q=>`${q.x} ${q.y}`).join(' L');
+ let d=`M${p[0].x} ${p[0].y}`;for(let i=1;i<p.length-1;i++){const a=p[i],b=p[i+1];d+=` Q${a.x} ${a.y} ${(a.x+b.x)/2} ${(a.y+b.y)/2}`}return d+` L${p.at(-1).x} ${p.at(-1).y}`;
+}
+const paths=new WeakMap();function geometry(a){if(!a?.points||a.points.length<2)return null;if(paths.has(a))return paths.get(a);const e=document.createElementNS(NS,'path');e.setAttribute('d',pathData(a));let length=0;try{length=e.getTotalLength()}catch(err){}const o={e,length};paths.set(a,o);return o}
+function at(a,f){const g=geometry(a);if(!g||!g.length)return a?.points?.[0]||{x:0,y:0};const p=g.e.getPointAtLength(g.length*clamp(f));return{x:p.x,y:p.y}}
+function trail(a,f){if(f<=.005||!a?.points||a.points.length<2)return;const g=$('routes'),head=clamp(f),tail=Math.max(0,head-.32),n=15,color=a.type==='pass'?'#252525':'#900021';
+ for(let i=0;i<n;i++){const lo=tail+(head-tail)*i/n,hi=tail+(head-tail)*(i+1)/n,p=at(a,lo),q=at(a,hi);make(g,'path',{d:`M${p.x} ${p.y} L${q.x} ${q.y}`,stroke:'#fff','stroke-width':Math.max(5,a.width||4)+3,'stroke-linecap':'round',opacity:.2+(i/n)*.25,fill:'none'});make(g,'path',{d:`M${p.x} ${p.y} L${q.x} ${q.y}`,stroke:color,'stroke-width':Math.max(3.7,(a.width||4)*1.18),'stroke-linecap':'round',opacity:(.07+.58*(i+1)/n).toFixed(2),fill:'none','stroke-dasharray':a.type==='pass'?'7 5':'none'})}
+ if(head>.03&&head<.985&&a.type!=='screen'&&a.type!=='handoff'){const p=at(a,head),q=at(a,Math.max(0,head-.015)),angle=Math.atan2(p.y-q.y,p.x-q.x)*180/Math.PI;make(g,'path',{d:'M-8 -5 L5 0 L-8 5 Z',transform:`translate(${p.x} ${p.y}) rotate(${angle})`,fill:color,opacity:.82})}
+ if(a.type==='screen'){const p=at(a,head),q=at(a,Math.max(0,head-.03)),angle=Math.atan2(p.y-q.y,p.x-q.x),nx=-Math.sin(angle),ny=Math.cos(angle);make(g,'path',{d:`M${p.x-12*nx} ${p.y-12*ny} L${p.x+12*nx} ${p.y+12*ny}`,stroke:'#202020','stroke-width':4,'stroke-linecap':'square'})}
+}
+function ballAt(x,y,r=11){const g=$('players');make(g,'circle',{cx:x,cy:y,r,fill:'#ffa72c',stroke:'#853513','stroke-width':2});make(g,'path',{d:`M${x-r+2} ${y}h${2*r-4} M${x} ${y-r+2}v${2*r-4}`,stroke:'#853513','stroke-width':1.4,fill:'none'})}
+function draw(positions,holder,active=[],ballPoint=null){const pg=$('players');pg.replaceChildren();$('routes').replaceChildren();for(const {a,f} of active)trail(a,f);
+ const st=play.steps[stepIndex],r=Number(play.size)||23;
+ for(const o of st.objects||[]){const p=positions[o.id]||o;if(o.type==='cone'){make(pg,'path',{d:`M${p.x-11} ${p.y+13}L${p.x} ${p.y-16}L${p.x+11} ${p.y+13}Z`,fill:'#b11d26',stroke:'#fff','stroke-width':2});continue}if(o.type==='ball'){ballAt(p.x,p.y);continue}
+ make(pg,'circle',{cx:p.x,cy:p.y,r:r+3,fill:'#fff'});make(pg,'circle',{cx:p.x,cy:p.y,r,fill:o.type==='def'?'#183f83':o.color||'#900021'});
+ const label=play.label==='name'?(o.name||String(o.num)):play.label==='position'?(o.pos||String(o.num)):'#'+o.num;
+ const t=make(pg,'text',{x:p.x,y:p.y+5,'font-size':Math.min(21,Math.max(10,37/Math.max(1,label.length/2))),'text-anchor':'middle','font-weight':'bold',fill:'#fff'});t.textContent=label;
+ if(holder===o.id&&!ballPoint)ballAt(p.x+r*.78,p.y-r*.78,12);
+ }
+ if(ballPoint)ballAt(ballPoint.x,ballPoint.y);
+}
+function startPositions(st){return Object.fromEntries((st.objects||[]).map(o=>[o.id,{x:o.x,y:o.y}]))}
+function actionDuration(a){const g=geometry(a),length=g?.length||0;if(a.type==='pass')return Math.max(480,Math.min(1050,length*2.4));if(a.type==='shot')return 900;return Math.max(750,Math.min(2300,length*5.2||1000))}
+function scheduleActions(st){const out=[];for(const a of st.actions||[]){const prev=out.at(-1),mode=a.timing||(a.together?'together':'after'),duration=actionDuration(a);const start=!prev?0:mode==='together'?prev.start:mode==='delay05'?prev.start+500:mode==='delay1'?prev.start+1000:prev.end;out.push({a,start,end:start+duration})}return out}
+function hoop(from){return play.view==='full'?(from.x<470?{x:78,y:300}:{x:862,y:300}):{x:470,y:103}}
+function sceneAt(st,schedule,elapsed){const positions=startPositions(st);let holder=st.ball,ballPoint=null;const active=[];
+ for(const item of schedule){if(elapsed<item.start)continue;const a=item.a,raw=clamp((elapsed-item.start)/Math.max(1,item.end-item.start)),f=ease(raw);
+ if(raw<1)active.push({a,f});
+ if(['cut','dribble','screen','handoff'].includes(a.type)&&a.from&&a.points?.length)positions[a.from]=at(a,f);
+ if(a.type==='pass'){
+  if(raw>=1){holder=a.to||null;ballPoint=null}else{holder=null;const from=a.points?.[0]||positions[a.from],to=positions[a.to]||a.points?.at(-1);if(from&&to)ballPoint={x:from.x+(to.x-from.x)*f,y:from.y+(to.y-from.y)*f-12*Math.sin(Math.PI*f)}}
+ }else if(a.type==='handoff'){
+  if(raw>=1){holder=a.to||null;ballPoint=null}else if(holder===a.from){holder=null;const p=positions[a.from];if(p)ballPoint={x:p.x+13,y:p.y-12}}
+ }else if(a.type==='shot'){
+  if(raw>=1){holder=null;ballPoint=null}else{holder=null;const p=a.points?.[0]||positions[a.from];if(p){const q=hoop(p);ballPoint={x:p.x+(q.x-p.x)*f,y:p.y+(q.y-p.y)*f-110*4*f*(1-f)}}}
+ }
+ }
+ return{positions,holder,ballPoint,active};
+}
+function renderStepList(){const root=$('steplist');root.replaceChildren();play.steps.forEach((st,i)=>{const b=document.createElement('button');b.className='stepitem'+(i===stepIndex?' active':'');b.textContent='Step '+(i+1);b.onclick=()=>{stop();stepIndex=i;display()};root.append(b);(st.actions||[]).forEach((a,j)=>{const el=document.createElement('div');el.className='actionitem pending';el.dataset.step=i;el.dataset.action=j;const player=st.objects?.find(o=>o.id===a.from);el.textContent=(j+1)+'. '+(player?'#'+player.num+' ':'')+({pass:'Pass',cut:'Cut / Move',screen:'Screen',dribble:'Dribble',handoff:'Handoff',shot:'Shot'}[a.type]||a.type)+(a.timing==='delay05'?' · Delay .5s':a.timing==='delay1'?' · Delay 1s':a.together?' · Together':'');root.append(el)})})}
+function highlight(si,schedule,elapsed){document.querySelectorAll('.actionitem').forEach(el=>{const i=Number(el.dataset.step),j=Number(el.dataset.action);let status='pending';if(i<si)status='completed';else if(i===si){const item=schedule[j];if(item)status=elapsed>=item.end?'completed':elapsed>=item.start?'current':'pending'}el.className='actionitem '+status});}
+function display(){renderStepList();markings();const st=play.steps[stepIndex];draw(startPositions(st),st.ball);$('stepstatus').textContent=`Step ${stepIndex+1} of ${play.steps.length}`;$('previous').disabled=stepIndex===0;$('next').disabled=stepIndex===play.steps.length-1}
+function swish(){try{const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;const ctx=audioContext||(audioContext=new AC());if(ctx.state==='suspended')ctx.resume();const n=Math.floor(ctx.sampleRate*.32),buf=ctx.createBuffer(1,n,ctx.sampleRate),samples=buf.getChannelData(0);for(let i=0;i<n;i++)samples[i]=(Math.random()*2-1)*Math.sin(Math.PI*i/n)**2*.36;const src=ctx.createBufferSource(),filter=ctx.createBiquadFilter(),gain=ctx.createGain();src.buffer=buf;filter.type='bandpass';filter.frequency.value=1400;gain.gain.value=.23;src.connect(filter);filter.connect(gain);gain.connect(ctx.destination);src.start();src.stop(ctx.currentTime+.32)}catch(e){}}
+function stop(){token++;running=false;if(animationFrame)cancelAnimationFrame(animationFrame);animationFrame=0;$('play').textContent='▶ Play'}
+async function animate(){stop();const mine=token;running=true;stepIndex=0;$('play').textContent='Playing…';try{const AC=window.AudioContext||window.webkitAudioContext;if(AC){audioContext=audioContext||new AC();audioContext.resume().catch(()=>{})}}catch(e){}
+ for(let si=0;si<play.steps.length&&mine===token;si++){
+  stepIndex=si;display();const st=play.steps[si],schedule=scheduleActions(st),total=Math.max(0,...schedule.map(x=>x.end)),sounded=new Set(),start=performance.now();
+  await new Promise(resolve=>{function frame(now){if(mine!==token){resolve();return}const elapsed=Math.min(total,now-start),scene=sceneAt(st,schedule,elapsed);draw(scene.positions,scene.holder,scene.active,scene.ballPoint);highlight(si,schedule,elapsed);for(let i=0;i<schedule.length;i++)if(schedule[i].a.type==='shot'&&elapsed>=schedule[i].end&&!sounded.has(i)){sounded.add(i);swish()}if(elapsed<total)animationFrame=requestAnimationFrame(frame);else resolve()}animationFrame=requestAnimationFrame(frame)});
+  if(si<play.steps.length-1&&mine===token)await new Promise(resolve=>setTimeout(resolve,350));
+ }
+ if(mine===token){running=false;$('play').textContent='▶ Play';$('stepstatus').textContent+=' · Finished'}
+}
+$('title').textContent=play.name||'Basketball Play';$('play').onclick=animate;$('restart').onclick=()=>{stop();stepIndex=0;display()};$('previous').onclick=()=>{stop();stepIndex=Math.max(0,stepIndex-1);display()};$('next').onclick=()=>{stop();stepIndex=Math.min(play.steps.length-1,stepIndex+1);display()};$('print').onclick=()=>window.print();$('downloadviewer').onclick=()=>{const blob=new Blob([document.documentElement.outerHTML],{type:'text/html;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(play.name||'Basketball_Play').replace(/[^a-z0-9_-]/gi,'_')+'_VIEW.html';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000)};display();
+})();</script></body></html>
