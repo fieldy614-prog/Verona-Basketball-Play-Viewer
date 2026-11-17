@@ -19,7 +19,7 @@ const $=id=>document.getElementById(id),NS='http://www.w3.org/2000/svg';
 const make=(parent,tag,attrs={})=>{const e=document.createElementNS(NS,tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,String(v));parent.append(e);return e};
 async function loadPlay(){
  const raw=location.hash.slice(1);
- if(!raw){document.body.innerHTML='<main style="font:18px Arial;padding:40px"><h1>Basketball Play Viewer</h1><p>No play was included in this link. Open a shared play link from your coach.</p></main>';return null}
+ if(!raw){document.body.innerHTML='<main style="font:18px Arial;padding:40px;max-width:750px;margin:auto"><h1>CoachClique · Test Viewer</h1><p>Paste your complete Rutgers share link below to load the original play. This test viewer does not modify your saved plays.</p><form id="openplay"><input id="playurl" aria-label="Original share link" placeholder="Paste original Rutgers share link" style="width:100%;padding:12px;margin-bottom:12px" required><button type="submit">Open Rutgers</button></form></main>';document.getElementById('openplay').onsubmit=e=>{e.preventDefault();const v=document.getElementById('playurl').value.trim();const h=v.includes('#')?v.split('#').pop():v;if(h)location.hash=h};return null}
  try{const bytes=Uint8Array.from(atob(raw.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0));const stream=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));const play=JSON.parse(await new Response(stream).text());if(!Array.isArray(play.steps)||!play.steps.length)throw Error('Invalid play');return play}
  catch(e){document.body.innerHTML='<main style="font:18px Arial;padding:40px"><h1>Unable to open this play</h1><p>The link may be incomplete. Ask your coach to copy and send the entire link.</p></main>';return null}
 }
@@ -59,12 +59,12 @@ function startPositions(st){return Object.fromEntries((st.objects||[]).map(o=>[o
 function actionDuration(a){const g=geometry(a),length=g?.length||0;if(a.type==='pass')return Math.max(480,Math.min(1050,length*2.4));if(a.type==='shot')return 900;return Math.max(750,Math.min(2300,length*5.2||1000))}
 function scheduleActions(st){const out=[];for(const a of st.actions||[]){const prev=out.at(-1),mode=a.timing||(a.together?'together':'after'),duration=actionDuration(a);const start=!prev?0:mode==='together'?prev.start:mode==='delay05'?prev.start+500:mode==='delay1'?prev.start+1000:prev.end;out.push({a,start,end:start+duration})}return out}
 function hoop(from){return play.view==='full'?(from.x<470?{x:78,y:300}:{x:862,y:300}):{x:470,y:103}}
-function sceneAt(st,schedule,elapsed){const positions=startPositions(st);let holder=st.ball,ballPoint=null;const active=[];
+function sceneAt(st,schedule,elapsed){const positions=startPositions(st);let holder=st.ball,ballPoint=null;const active=[];const latestMoveStart=new Map();
  for(const item of schedule){if(elapsed<item.start)continue;const a=item.a,raw=clamp((elapsed-item.start)/Math.max(1,item.end-item.start)),f=ease(raw);
  active.push({a,f});
- if(['cut','dribble','screen','handoff'].includes(a.type)&&a.from&&a.points?.length)positions[a.from]=at(a,f);
+ if(['cut','dribble','screen','handoff'].includes(a.type)&&a.from&&a.points?.length && item.start>= (latestMoveStart.get(a.from)??-1)){latestMoveStart.set(a.from,item.start);const current=positions[a.from];const next=at(a,f);if(Number.isFinite(next.x)&&Number.isFinite(next.y))positions[a.from]=next;else if(current)positions[a.from]=current;}
  if(a.type==='pass'){
-  if(raw>=1){holder=a.to||null;ballPoint=null}else{holder=null;const from=a.points?.[0]||positions[a.from],to=positions[a.to]||a.points?.at(-1);if(from&&to)ballPoint={x:from.x+(to.x-from.x)*f,y:from.y+(to.y-from.y)*f-12*Math.sin(Math.PI*f)}}
+  if(raw>=1){holder=a.to||null;ballPoint=null}else{holder=null;const from=positions[a.from]||a.points?.[0],to=positions[a.to]||a.points?.at(-1);if(from&&to)ballPoint={x:from.x+(to.x-from.x)*f,y:from.y+(to.y-from.y)*f-12*Math.sin(Math.PI*f)}}
  }else if(a.type==='handoff'){
   if(raw>=1){holder=a.to||null;ballPoint=null}else if(holder===a.from){holder=null;const p=positions[a.from];if(p)ballPoint={x:p.x+13,y:p.y-12}}
  }else if(a.type==='shot'){
