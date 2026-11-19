@@ -51,7 +51,7 @@ function trail(a,f){if(f<=.005||!a?.points||a.points.length<2)return;const g=$('
 }
 function ballAt(x,y,r=11){const g=$('players');make(g,'circle',{cx:x,cy:y,r,fill:'#ffa72c',stroke:'#853513','stroke-width':2});make(g,'path',{d:`M${x-r+2} ${y}h${2*r-4} M${x} ${y-r+2}v${2*r-4}`,stroke:'#853513','stroke-width':1.4,fill:'none'})}
 function draw(positions,holder,active=[],ballPoint=null){const pg=$('players');pg.replaceChildren();$('routes').replaceChildren();for(const {a,f} of active)trail(a,f);
- const st=play.steps[stepIndex],r=(Number(play.size)||23)*(2/3)-(play.view==='full'?2:0);
+ const st=play.steps[stepIndex],r=(Number(play.size)||23)*.56-(play.view==='full'?2:0);
  for(const o of st.objects||[]){const p=positions[o.id]||o;if(o.type==='cone'){make(pg,'path',{d:`M${p.x-11} ${p.y+13}L${p.x} ${p.y-16}L${p.x+11} ${p.y+13}Z`,fill:'#b11d26',stroke:'#fff','stroke-width':2});continue}if(o.type==='ball'){ballAt(p.x,p.y);continue}
  make(pg,'circle',{cx:p.x,cy:p.y,r:r+3,fill:'#fff'});make(pg,'circle',{cx:p.x,cy:p.y,r,fill:o.type==='def'?'#183f83':o.color||'#900021'});
  const label=play.label==='name'?(o.name||String(o.num)):play.label==='position'?(o.pos||String(o.num)):'#'+o.num;
@@ -59,6 +59,19 @@ function draw(positions,holder,active=[],ballPoint=null){const pg=$('players');p
  if(holder===o.id&&!ballPoint)ballAt(p.x+r*.78,p.y-r*.78,12);
  }
  if(ballPoint)ballAt(ballPoint.x,ballPoint.y);
+}
+function screenMarkers(schedule,elapsed){
+ const g=$('routes'),r=(Number(play.size)||23)*.56-(play.view==='full'?2:0);
+ for(let i=0;i<schedule.length;i++){
+  const item=schedule[i],a=item.a;
+  if(a.type!=='screen'||elapsed<item.start||!a.points||a.points.length<2)continue;
+  if(schedule.slice(i+1).some(next=>next.start<=elapsed&&next.a.from===a.from&&['cut','dribble','screen','handoff'].includes(next.a.type)))continue;
+  const f=clamp((elapsed-item.start)/Math.max(1,item.end-item.start)),p=at(a,f),before=at(a,Math.max(0,f-.04));
+  let dx=p.x-before.x,dy=p.y-before.y;
+  if(Math.hypot(dx,dy)<.01){const first=a.points[0];dx=p.x-first.x;dy=p.y-first.y}
+  const mag=Math.hypot(dx,dy)||1,ux=dx/mag,uy=dy/mag,nx=-uy,ny=ux,cx=p.x+ux*(r+5),cy=p.y+uy*(r+5),h=13;
+  make(g,'path',{d:'M'+(cx-nx*h)+' '+(cy-ny*h)+' L'+(cx+nx*h)+' '+(cy+ny*h)+' M'+cx+' '+cy+' L'+(cx-ux*11)+' '+(cy-uy*11),stroke:'#111','stroke-width':4.5,'stroke-linecap':'round',fill:'none'});
+ }
 }
 function startPositions(st){return Object.fromEntries((st.objects||[]).map(o=>[o.id,{x:o.x,y:o.y}]))}
 function actionDuration(a){const g=geometry(a),length=g?.length||0;if(a.type==='pass')return Math.max(480,Math.min(1050,length*2.4));if(a.type==='shot')return 900;return Math.max(750,Math.min(2300,length*5.2||1000))}
@@ -86,7 +99,7 @@ function stop(){token++;running=false;if(animationFrame)cancelAnimationFrame(ani
 async function animate(){stop();const mine=token;running=true;stepIndex=0;$('play').textContent='Playing…';try{const AC=window.AudioContext||window.webkitAudioContext;if(AC){audioContext=audioContext||new AC();audioContext.resume().catch(()=>{})}}catch(e){}
  for(let si=0;si<play.steps.length&&mine===token;si++){
   stepIndex=si;display();const st=play.steps[si],schedule=scheduleActions(st),total=Math.max(0,...schedule.map(x=>x.end)),sounded=new Set(),start=performance.now();
-  await new Promise(resolve=>{function frame(now){if(mine!==token){resolve();return}const elapsed=Math.min(total,now-start),scene=sceneAt(st,schedule,elapsed);draw(scene.positions,scene.holder,scene.active,scene.ballPoint);highlight(si,schedule,elapsed);for(let i=0;i<schedule.length;i++)if(schedule[i].a.type==='shot'&&elapsed>=schedule[i].end&&!sounded.has(i)){sounded.add(i);swish()}if(elapsed<total)animationFrame=requestAnimationFrame(frame);else resolve()}animationFrame=requestAnimationFrame(frame)});
+  await new Promise(resolve=>{function frame(now){if(mine!==token){resolve();return}const elapsed=Math.min(total,now-start),scene=sceneAt(st,schedule,elapsed);draw(scene.positions,scene.holder,scene.active,scene.ballPoint);screenMarkers(schedule,elapsed);highlight(si,schedule,elapsed);for(let i=0;i<schedule.length;i++)if(schedule[i].a.type==='shot'&&elapsed>=schedule[i].end&&!sounded.has(i)){sounded.add(i);swish()}if(elapsed<total)animationFrame=requestAnimationFrame(frame);else resolve()}animationFrame=requestAnimationFrame(frame)});
   if(si<play.steps.length-1&&mine===token)await new Promise(resolve=>setTimeout(resolve,350));
  }
  if(mine===token){running=false;$('play').textContent='▶ Play';$('stepstatus').textContent+=' · Finished'}
