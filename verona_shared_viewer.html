@@ -62,6 +62,8 @@ function draw(positions,holder,active=[],ballPoint=null){const pg=$('players');p
 }
 function screenMarkers(schedule,elapsed){
  const g=$('routes'),r=(Number(play.size)||23)*.56-(play.view==='full'?2:0);
+ // Screen indicators are temporary playback state, never permanent court marks.
+ if(elapsed>=Math.max(0,...schedule.map(item=>item.end)))return;
  for(let i=0;i<schedule.length;i++){
   const item=schedule[i],a=item.a;
   if(a.type!=='screen'||elapsed<item.start||!a.points||a.points.length<2)continue;
