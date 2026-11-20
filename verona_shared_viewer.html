@@ -52,15 +52,15 @@ function trail(a,f){if(f<=.005||!a?.points||a.points.length<2)return;const g=$('
  // Screen T is rendered only by screenMarkers to avoid duplicate moving bars.
 }
 function ballAt(x,y,r=11){const g=$('players');make(g,'circle',{cx:x,cy:y,r,fill:'#ffa72c',stroke:'#853513','stroke-width':2});make(g,'path',{d:`M${x-r+2} ${y}h${2*r-4} M${x} ${y-r+2}v${2*r-4}`,stroke:'#853513','stroke-width':1.4,fill:'none'})}
-function draw(positions,holder,active=[],ballPoint=null){const pg=$('players');pg.replaceChildren();$('routes').replaceChildren();for(const {a,f} of active)trail(a,f);
+function draw(positions,holder,active=[],ballPoint=null,drillBalls=null){const pg=$('players');pg.replaceChildren();$('routes').replaceChildren();for(const {a,f} of active)trail(a,f);
  const st=play.steps[stepIndex],r=(Number(play.size)||23)*.56-(play.view==='full'?2:0);
- for(const o of st.objects||[]){const p=positions[o.id]||o;if(o.type==='cone'){make(pg,'path',{d:`M${p.x-11} ${p.y+13}L${p.x} ${p.y-16}L${p.x+11} ${p.y+13}Z`,fill:'#ff6500',stroke:'#fff','stroke-width':3.5});continue}if(o.type==='ball'){ballAt(p.x,p.y);continue}
+ for(const o of st.objects||[]){const p=positions[o.id]||o;if(o.type==='cone'){make(pg,'path',{d:`M${p.x-11} ${p.y+13}L${p.x} ${p.y-16}L${p.x+11} ${p.y+13}Z`,fill:'#ff6500',stroke:'#fff','stroke-width':3.5});continue}if(o.type==='ball'){if(play.mode==='drill'){const flight=drillBalls?.flights?.[o.id],owner=drillBalls?.owners?.[o.id]??o.holder,at=flight||(owner&&positions[owner]?{x:positions[owner].x+24,y:positions[owner].y-24}:p);ballAt(at.x,at.y)}else ballAt(p.x,p.y);continue}
  make(pg,'circle',{cx:p.x,cy:p.y,r:r+3,fill:'#fff'});make(pg,'circle',{cx:p.x,cy:p.y,r,fill:o.type==='def'?'#183f83':o.color||'#900021'});
  const label=play.label==='name'?(o.name||String(o.num)):play.label==='position'?(o.pos||String(o.num)):'#'+o.num;
  const t=make(pg,'text',{x:p.x,y:p.y+5,'font-size':Math.min(play.view==='half'?16:14,Math.max(10,37/Math.max(1,label.length/2))),'text-anchor':'middle','font-weight':'bold',fill:'#fff'});t.textContent=label;
- if(holder===o.id&&!ballPoint)ballAt(p.x+r*.78,p.y-r*.78,12);
+ if(play.mode!=='drill'&&holder===o.id&&!ballPoint)ballAt(p.x+r*.78,p.y-r*.78,12);
  }
- if(ballPoint)ballAt(ballPoint.x,ballPoint.y);
+ if(play.mode!=='drill'&&ballPoint)ballAt(ballPoint.x,ballPoint.y);
 }
 function screenMarkers(schedule,elapsed){
  const g=$('routes'),r=(Number(play.size)||23)*.56-(play.view==='full'?2:0);
@@ -83,6 +83,7 @@ function startPositions(st){return Object.fromEntries((st.objects||[]).map(o=>[o
 function actionDuration(a){const g=geometry(a),length=g?.length||0;if(a.type==='pass')return Math.max(480,Math.min(1050,length*2.4));if(a.type==='shot')return 900;return Math.max(750,Math.min(2300,length*5.2||1000))}
 function scheduleActions(st){const out=[];for(const a of st.actions||[]){const prev=out.at(-1),mode=a.timing||(a.together?'together':'after'),duration=actionDuration(a);const start=!prev?0:mode==='together'?prev.start:mode==='delay05'?prev.start+500:mode==='delay1'?prev.start+1000:prev.end;out.push({a,start,end:start+duration})}return out}
 function hoop(from){return play.view==='full'?(from.x<470?{x:78,y:300}:{x:862,y:300}):{x:470,y:103}}
+function drillBallScene(st,schedule,elapsed,positions){const owners=Object.fromEntries((st.objects||[]).filter(o=>o.type==='ball').map(o=>[o.id,o.holder||null])),flights={};for(const item of schedule){if(elapsed<item.start)continue;const a=item.a;if(!['pass','handoff','shot'].includes(a.type))continue;const f=clamp((elapsed-item.start)/Math.max(1,item.end-item.start)),id=Object.keys(owners).find(id=>owners[id]===a.from);if(!id)continue;if(a.type==='shot'){owners[id]=null;if(f<1){const from=positions[a.from]||st.objects.find(o=>o.id===a.from);if(from){const to=hoop(from);flights[id]={x:from.x+(to.x-from.x)*f,y:from.y+(to.y-from.y)*f-95*Math.sin(Math.PI*f)}}}}else if(f>=1)owners[id]=a.to||null;else if(a.type==='pass'){owners[id]=null;const from=positions[a.from]||st.objects.find(o=>o.id===a.from),to=positions[a.to]||st.objects.find(o=>o.id===a.to);if(from&&to)flights[id]={x:from.x+(to.x-from.x)*f,y:from.y+(to.y-from.y)*f-12*Math.sin(Math.PI*f)}}return{owners,flights}}
 function sceneAt(st,schedule,elapsed){const positions=startPositions(st);let holder=st.ball,ballPoint=null;const active=[];
  for(const item of schedule){if(elapsed<item.start)continue;const a=item.a,raw=clamp((elapsed-item.start)/Math.max(1,item.end-item.start)),f=ease(raw);
  if(raw<1)active.push({a,f});
@@ -95,17 +96,17 @@ function sceneAt(st,schedule,elapsed){const positions=startPositions(st);let hol
   if(raw>=1){holder=null;ballPoint=null}else{holder=null;const p=a.points?.[0]||positions[a.from];if(p){const q=hoop(p);ballPoint={x:p.x+(q.x-p.x)*f,y:p.y+(q.y-p.y)*f-110*4*f*(1-f)}}}
  }
  }
- return{positions,holder,ballPoint,active};
+ return{positions,holder,ballPoint,active,drillBalls:play.mode==='drill'?drillBallScene(st,schedule,elapsed,positions):null};
 }
 function renderStepList(){const root=$('steplist');root.replaceChildren();play.steps.forEach((st,i)=>{const b=document.createElement('button');b.className='stepitem'+(i===stepIndex?' active':'');b.textContent='Step '+(i+1);b.onclick=()=>{stop();stepIndex=i;display()};root.append(b);(st.actions||[]).forEach((a,j)=>{const el=document.createElement('div');el.className='actionitem pending';el.dataset.step=i;el.dataset.action=j;const player=st.objects?.find(o=>o.id===a.from);el.textContent=(j+1)+'. '+(player?'#'+player.num+' ':'')+({pass:'Pass',cut:'Cut / Move',screen:'Screen',dribble:'Dribble',handoff:'Handoff',shot:'Shot'}[a.type]||a.type)+(a.timing==='delay05'?' · Delay .5s':a.timing==='delay1'?' · Delay 1s':a.together?' · Together':'');root.append(el)})})}
 function highlight(si,schedule,elapsed){document.querySelectorAll('.actionitem').forEach(el=>{const i=Number(el.dataset.step),j=Number(el.dataset.action);let status='pending';if(i<si)status='completed';else if(i===si){const item=schedule[j];if(item)status=elapsed>=item.end?'completed':elapsed>=item.start?'current':'pending'}el.className='actionitem '+status});}
-function display(){renderStepList();markings();const st=play.steps[stepIndex];draw(startPositions(st),st.ball);$('stepstatus').textContent=`Step ${stepIndex+1} of ${play.steps.length}`;$('previous').disabled=stepIndex===0;$('next').disabled=stepIndex===play.steps.length-1}
+function display(){renderStepList();markings();const st=play.steps[stepIndex];draw(startPositions(st),st.ball,[],null,play.mode==='drill'?drillBallScene(st,[],0,startPositions(st)):null);$('stepstatus').textContent=`Step ${stepIndex+1} of ${play.steps.length}`;$('previous').disabled=stepIndex===0;$('next').disabled=stepIndex===play.steps.length-1}
 function swish(){try{const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;const ctx=audioContext||(audioContext=new AC());if(ctx.state==='suspended')ctx.resume();const n=Math.floor(ctx.sampleRate*.32),buf=ctx.createBuffer(1,n,ctx.sampleRate),samples=buf.getChannelData(0);for(let i=0;i<n;i++)samples[i]=(Math.random()*2-1)*Math.sin(Math.PI*i/n)**2*.36;const src=ctx.createBufferSource(),filter=ctx.createBiquadFilter(),gain=ctx.createGain();src.buffer=buf;filter.type='bandpass';filter.frequency.value=1400;gain.gain.value=.23;src.connect(filter);filter.connect(gain);gain.connect(ctx.destination);src.start();src.stop(ctx.currentTime+.32)}catch(e){}}
 function stop(){token++;running=false;if(animationFrame)cancelAnimationFrame(animationFrame);animationFrame=0;$('play').textContent='▶ Play'}
 async function animate(){stop();const mine=token;running=true;stepIndex=0;$('play').textContent='Playing…';try{const AC=window.AudioContext||window.webkitAudioContext;if(AC){audioContext=audioContext||new AC();audioContext.resume().catch(()=>{})}}catch(e){}
  for(let si=0;si<play.steps.length&&mine===token;si++){
   stepIndex=si;display();const st=play.steps[si],schedule=scheduleActions(st),total=Math.max(0,...schedule.map(x=>x.end)),sounded=new Set(),start=performance.now();
-  await new Promise(resolve=>{function frame(now){if(mine!==token){resolve();return}const elapsed=Math.min(total,now-start),scene=sceneAt(st,schedule,elapsed);draw(scene.positions,scene.holder,scene.active,scene.ballPoint);screenMarkers(schedule,elapsed);highlight(si,schedule,elapsed);for(let i=0;i<schedule.length;i++)if(schedule[i].a.type==='shot'&&elapsed>=schedule[i].end&&!sounded.has(i)){sounded.add(i);swish()}if(elapsed<total)animationFrame=requestAnimationFrame(frame);else resolve()}animationFrame=requestAnimationFrame(frame)});
+  await new Promise(resolve=>{function frame(now){if(mine!==token){resolve();return}const elapsed=Math.min(total,now-start),scene=sceneAt(st,schedule,elapsed);draw(scene.positions,scene.holder,scene.active,scene.ballPoint,scene.drillBalls);screenMarkers(schedule,elapsed);highlight(si,schedule,elapsed);for(let i=0;i<schedule.length;i++)if(schedule[i].a.type==='shot'&&elapsed>=schedule[i].end&&!sounded.has(i)){sounded.add(i);swish()}if(elapsed<total)animationFrame=requestAnimationFrame(frame);else resolve()}animationFrame=requestAnimationFrame(frame)});
   if(si<play.steps.length-1&&mine===token)await new Promise(resolve=>setTimeout(resolve,350));
  }
  if(mine===token){running=false;$('play').textContent='▶ Play';$('stepstatus').textContent+=' · Finished'}
