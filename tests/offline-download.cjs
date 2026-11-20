@@ -9,7 +9,7 @@ const zlib=require('node:zlib');
  try{
   const page=await context.newPage();
   const play={name:'Offline Viewer Regression',view:'half',size:24,label:'number',mode:'play',steps:[
-   {objects:[{id:'p1',type:'off',num:1,x:200,y:300},{id:'p2',type:'off',num:2,x:400,y:300}],ball:'p1',actions:[]},
+   {objects:[{id:'p1',type:'off',num:1,x:200,y:300},{id:'p2',type:'off',num:2,x:400,y:300}],ball:'p1',actions:[{type:'pass',from:'p1',to:'p2',points:[{x:200,y:300},{x:400,y:300}]}]},
    {objects:[{id:'p1',type:'off',num:1,x:200,y:300},{id:'p2',type:'off',num:2,x:400,y:300}],ball:'p1',actions:[]}
   ]};
   const encoded=zlib.gzipSync(JSON.stringify(play)).toString('base64url');
@@ -30,12 +30,14 @@ const zlib=require('node:zlib');
   await offline.locator('#title').waitFor();
   if(await offline.locator('#title').textContent()!==play.name)throw Error('Offline viewer lost play name');
   if(await offline.locator('.stepitem').count()!==2)throw Error('Offline viewer lost steps');
+  if(await offline.locator('.actionitem').count()!==1)throw Error('Offline viewer lost the authored pass');
+  if(!(await offline.locator('.actionitem').first().textContent()).includes('Pass'))throw Error('Offline viewer changed action type');
   await offline.locator('#next').click();
   if(!(await offline.locator('#stepstatus').textContent()).includes('2'))throw Error('Next step did not work offline');
   await offline.locator('#flip').click();
   if(!(await offline.locator('#stepstatus').textContent()).includes('1'))throw Error('Flip did not return to first step');
   await offline.locator('#play').click();
-  await offline.waitForTimeout(900);
+  await offline.waitForTimeout(1500);
   if(!(await offline.locator('#stepstatus').textContent()).includes('Finished'))throw Error('Offline playback did not finish');
   console.log('Verified shared play download reopens offline with steps, navigation, flip, and playback');
  }finally{await browser.close()}
