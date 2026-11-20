@@ -1,0 +1,21 @@
+name: Offline viewer browser regression
+on:
+  push:
+    branches:
+      - feature/self-contained-offline-download
+  workflow_dispatch:
+jobs:
+  offline-viewer:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Playwright
+        run: npm install --no-save playwright@1.58.2
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Verify offline downloaded play
+        run: node tests/offline-download.cjs
