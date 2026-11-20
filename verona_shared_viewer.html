@@ -92,7 +92,7 @@ function drillBallScene(st,schedule,elapsed,positions){
   if(!['pass','handoff','shot'].includes(item.a.type))continue;
   events.push({time:item.start,kind:'start',item},{time:item.end,kind:'end',item});
  }
- events.sort((a,b)=>a.time-b.time||(a.kind==='end'?-1:1));
+ events.sort((a,b)=>a.time-b.time||(a.kind===b.kind?0:a.kind==='end'?-1:1));
  for(const event of events){
   if(event.time>elapsed)break;
   const a=event.item.a;
