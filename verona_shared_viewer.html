@@ -29,7 +29,7 @@ let viewerOption=0;play.steps=viewerOptions[0];
 function mirrorSharedPlay(){
  const flip=p=>{if(p&&Number.isFinite(p.x))p.x=940-p.x};
  for(const st of play.steps){for(const o of st.objects||[])flip(o);for(const a of st.actions||[])for(const p of a.points||[])flip(p)}
- if(play.templateStart)for(const o of play.templateStart.objects||[])flip(o);
+ if(viewerOption===0&&play.templateStart)for(const o of play.templateStart.objects||[])flip(o);
  // Mirrored coordinates must not reuse pre-flip SVG path geometry.
  paths=new WeakMap();
 }
